@@ -62,4 +62,147 @@ void main() {
 
     expect(await resp.stream.length, 5);
   });
+
+  test('request cancellation', () async {
+    final mock = AbortClientMock();
+    final cla = ConversionLayerAdapter(mock);
+    final cancelToken = CancelToken();
+
+    Future<void>.delayed(const Duration(seconds: 1)).then(
+      (value) {
+        cancelToken.cancel();
+      },
+    );
+
+    await expectLater(
+      () => cla.fetch(
+        RequestOptions(path: ''),
+        null,
+        cancelToken.whenCancel,
+      ),
+      throwsA(isA<AbortedError>()),
+    );
+  });
+
+  test('request cancellation with Dio', () async {
+    final mock = AbortClientMock();
+    final cla = ConversionLayerAdapter(mock);
+    final dio = Dio();
+    dio.httpClientAdapter = cla;
+
+    final cancelToken = CancelToken();
+
+    Future<void>.delayed(const Duration(seconds: 1)).then(
+      (value) {
+        cancelToken.cancel();
+      },
+    );
+
+    await expectLater(
+      () => dio.get<ResponseBody>('', cancelToken: cancelToken),
+      throwsA(
+        isA<DioException>().having(
+          (e) => e.type,
+          'type',
+          DioExceptionType.cancel,
+        ),
+      ),
+    );
+    expect(mock.isRequestCanceled, true);
+  });
+
+  group('Timeout tests', () {
+    test('sendTimeout throws DioException.sendTimeout', () async {
+      final mock = ClientMock()
+        ..response = StreamedResponse(const Stream.empty(), 200);
+      final cla = ConversionLayerAdapter(mock);
+
+      final delayedStream = Stream<Uint8List>.periodic(
+        const Duration(milliseconds: 10),
+        (count) => Uint8List.fromList([count]),
+      );
+
+      try {
+        await cla.fetch(
+          RequestOptions(
+            path: '',
+            sendTimeout: const Duration(milliseconds: 1),
+          ),
+          delayedStream,
+          null,
+        );
+        fail('Should have thrown DioException');
+      } on DioException catch (e) {
+        expect(e.type, DioExceptionType.sendTimeout);
+        expect(e.message, contains('1'));
+      }
+    });
+
+    test('receiveTimeout throws DioException.receiveTimeout', () async {
+      final mock = DelayedClientMock(
+        duration: const Duration(milliseconds: 10),
+      );
+      final cla = ConversionLayerAdapter(mock);
+
+      try {
+        await cla.fetch(
+          RequestOptions(
+            path: '',
+            receiveTimeout: const Duration(milliseconds: 1),
+          ),
+          null,
+          null,
+        );
+        fail('Should have thrown DioException');
+      } on DioException catch (e) {
+        expect(e.type, DioExceptionType.receiveTimeout);
+        expect(e.message, contains('1'));
+      }
+    });
+
+    test('connectTimeout and receiveTimeout are combined', () async {
+      final mock = DelayedClientMock(
+        duration: const Duration(milliseconds: 10),
+      );
+      final cla = ConversionLayerAdapter(mock);
+
+      try {
+        await cla.fetch(
+          RequestOptions(
+            path: '',
+            connectTimeout: const Duration(milliseconds: 1),
+            receiveTimeout: const Duration(milliseconds: 1),
+          ),
+          null,
+          null,
+        );
+        fail('Should have thrown DioException');
+      } on DioException catch (e) {
+        expect(e.type, DioExceptionType.receiveTimeout);
+        expect(e.message, contains('2'));
+      }
+    });
+
+    test('AbortableRequest is triggered on receiveTimeout', () async {
+      final mock = AbortClientMock();
+      final cla = ConversionLayerAdapter(mock);
+
+      try {
+        await cla.fetch(
+          RequestOptions(
+            path: '',
+            receiveTimeout: const Duration(milliseconds: 1),
+          ),
+          null,
+          null,
+        );
+        fail('Should have thrown DioException');
+      } on DioException catch (e) {
+        expect(e.type, DioExceptionType.receiveTimeout);
+        // Give delay for the abortTrigger callback to execute
+        await Future<void>.delayed(Duration.zero);
+        expect(mock.isRequestCanceled, isTrue);
+      }
+    });
+  });
 }

@@ -1,6 +1,6 @@
 import 'package:dio/dio.dart';
 
-import 'adapter.dart';
+import 'adapter_impl.dart';
 
 /// Create the [Dio] instance for Web platforms.
 Dio createDio([BaseOptions? options]) => DioForBrowser(options);
@@ -9,8 +9,8 @@ Dio createDio([BaseOptions? options]) => DioForBrowser(options);
 class DioForBrowser with DioMixin implements Dio {
   /// Create Dio instance with default [Options].
   /// It's mostly just one Dio instance in your application.
-  DioForBrowser([BaseOptions? options]) {
-    this.options = options ?? BaseOptions();
+  DioForBrowser([BaseOptions? baseOptions]) {
+    options = baseOptions ?? BaseOptions();
     httpClientAdapter = BrowserHttpClientAdapter();
   }
 
@@ -22,6 +22,7 @@ class DioForBrowser with DioMixin implements Dio {
     Map<String, dynamic>? queryParameters,
     CancelToken? cancelToken,
     bool deleteOnError = true,
+    FileAccessMode fileAccessMode = FileAccessMode.write,
     String lengthHeader = Headers.contentLengthHeader,
     Object? data,
     Options? options,

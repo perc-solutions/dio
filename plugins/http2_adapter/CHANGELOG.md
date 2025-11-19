@@ -1,8 +1,15 @@
 # CHANGELOG
 
+**Before you upgrade: Breaking changes might happen in major and minor versions of packages.<br/>
+See the [Migration Guide][] for the complete breaking changes list.**
+
 ## Unreleased
 
-*None.*
+- Add `handshakeTimeout` (defaults to 15 seconds) to the `ConnectionManager` to prevent long waiting if there's something wrong with the handshake procedure.
+
+## 2.6.0
+
+- Make cached connections respect redirections and scheme.
 
 ## 2.5.3
 
@@ -80,3 +87,5 @@
 ## 0.0.2 - 2019.9.17
 
 - A Dio HttpAdapter which support Http/2.0.
+
+[Migration Guide]: doc/migration_guide.md

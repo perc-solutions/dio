@@ -209,6 +209,9 @@ abstract class Dio {
   /// [deleteOnError] whether delete the file when error occurs.
   /// The default value is [true].
   ///
+  /// [fileAccessMode]
+  /// {@macro dio.options.FileAccessMode}
+  ///
   /// [lengthHeader] : The real size of original file (not compressed).
   /// When file is compressed:
   /// 1. If this value is 'content-length', the `total` argument of
@@ -242,6 +245,7 @@ abstract class Dio {
     Map<String, dynamic>? queryParameters,
     CancelToken? cancelToken,
     bool deleteOnError = true,
+    FileAccessMode fileAccessMode = FileAccessMode.write,
     String lengthHeader = Headers.contentLengthHeader,
     Object? data,
     Options? options,
@@ -254,6 +258,7 @@ abstract class Dio {
     ProgressCallback? onReceiveProgress,
     CancelToken? cancelToken,
     bool deleteOnError = true,
+    FileAccessMode fileAccessMode = FileAccessMode.write,
     String lengthHeader = Headers.contentLengthHeader,
     Object? data,
     Options? options,
@@ -266,6 +271,7 @@ abstract class Dio {
       deleteOnError: deleteOnError,
       cancelToken: cancelToken,
       data: data,
+      fileAccessMode: fileAccessMode,
       options: options,
     );
   }
@@ -294,4 +300,12 @@ abstract class Dio {
   /// The eventual method to submit requests. All callers for requests should
   /// eventually go through this method.
   Future<Response<T>> fetch<T>(RequestOptions requestOptions);
+
+  /// Clones a new [Dio] instance with override fields or reuses current fields.
+  Dio clone({
+    BaseOptions? options,
+    Interceptors? interceptors,
+    HttpClientAdapter? httpClientAdapter,
+    Transformer? transformer,
+  });
 }

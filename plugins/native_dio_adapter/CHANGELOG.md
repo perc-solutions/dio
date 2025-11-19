@@ -2,7 +2,17 @@
 
 ## Unreleased
 
-*None.*
+- Support request cancellation for native HTTP clients via use of `AbortableRequest` (introduced in http package from version 1.5.0)
+- Add timeout handling for `sendTimeout`, `connectTimeout`, and `receiveTimeout` in `ConversionLayerAdapter`
+
+## 1.5.0
+
+- Close the `CronetEngine` when closing the `CronetClient` by default.
+- Expose underlying adapters from all adapters.
+
+## 1.4.0
+
+- Support `cupertino_http` 2.0.0
 
 ## 1.3.0
 

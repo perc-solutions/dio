@@ -16,12 +16,14 @@ ide:
 command:
   bootstrap:
     runPubGetInParallel: false
+    hooks:
+      # Check bootstrappable packages.
+      pre: |
+        dart ./scripts/melos_packages.dart
   clean:
     hooks:
+      # Clean all coverage files
       post: |
-        # Clean all flutter projects
-        melos exec --flutter -- "flutter clean"
-        # Clean coverage files
         rm -rf coverage
         rm -rf pubspec.lock
         melos exec --dir-exists coverage -- "rm -rf coverage"

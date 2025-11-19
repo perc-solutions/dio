@@ -7,18 +7,23 @@ part of 'http2_adapter.dart';
 abstract class ConnectionManager {
   factory ConnectionManager({
     Duration idleTimeout = const Duration(seconds: 15),
+    Duration handshakeTimout = const Duration(seconds: 15),
     void Function(Uri uri, ClientSetting)? onClientCreate,
     ProxyConnectedPredicate proxyConnectedPredicate =
         defaultProxyConnectedPredicate,
   }) =>
       _ConnectionManager(
         idleTimeout: idleTimeout,
+        handshakeTimeout: handshakeTimout,
         onClientCreate: onClientCreate,
         proxyConnectedPredicate: proxyConnectedPredicate,
       );
 
   /// Get the connection(may reuse) for each request.
-  Future<ClientTransportConnection> getConnection(RequestOptions options);
+  Future<ClientTransportConnection> getConnection(
+    RequestOptions options,
+    List<RedirectRecord> redirects,
+  );
 
   void removeConnection(ClientTransportConnection transport);
 

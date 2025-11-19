@@ -4,9 +4,11 @@ part of 'http2_adapter.dart';
 class _ConnectionManager implements ConnectionManager {
   _ConnectionManager({
     Duration? idleTimeout,
+    Duration? handshakeTimeout,
     this.onClientCreate,
     this.proxyConnectedPredicate = defaultProxyConnectedPredicate,
-  }) : _idleTimeout = idleTimeout ?? const Duration(seconds: 1);
+  })  : _idleTimeout = idleTimeout ?? const Duration(seconds: 1),
+        _handshakeTimeout = handshakeTimeout ?? const Duration(seconds: 15);
 
   /// Callback when socket created.
   ///
@@ -22,6 +24,12 @@ class _ConnectionManager implements ConnectionManager {
   /// the value should not be less than 1 second.
   final Duration _idleTimeout;
 
+  /// Sets the handshake timeout for secure socket connections.
+  ///
+  /// This timeout is applied to a future returned by [RawSecureSocket.secure],
+  /// which actually is a handshake future.
+  final Duration _handshakeTimeout;
+
   /// Saving the reusable connections
   final _transportsMap = <String, _ClientTransportConnectionState>{};
 
@@ -34,38 +42,47 @@ class _ConnectionManager implements ConnectionManager {
   @override
   Future<ClientTransportConnection> getConnection(
     RequestOptions options,
+    List<RedirectRecord> redirects,
   ) async {
     if (_closed) {
       throw Exception(
         "Can't establish connection after [ConnectionManager] closed!",
       );
     }
-    final uri = options.uri;
-    final domain = '${uri.host}:${uri.port}';
-    _ClientTransportConnectionState? transportState = _transportsMap[domain];
+    Uri uri = options.uri;
+    if (redirects.isNotEmpty) {
+      uri = Http2Adapter.resolveRedirectUri(uri, redirects.last.location);
+    }
+    // Identify whether the connection can be reused.
+    // [Uri.scheme] is required when redirecting from non-TLS to TLS connection.
+    final transportCacheKey = '${uri.scheme}://${uri.host}:${uri.port}';
+    _ClientTransportConnectionState? transportState =
+        _transportsMap[transportCacheKey];
     if (transportState == null) {
       Future<_ClientTransportConnectionState>? initFuture =
-          _connectFutures[domain];
+          _connectFutures[transportCacheKey];
       if (initFuture == null) {
-        _connectFutures[domain] = initFuture = _connect(options);
+        _connectFutures[transportCacheKey] =
+            initFuture = _connect(options, redirects);
       }
       try {
         transportState = await initFuture;
       } catch (e) {
-        _connectFutures.remove(domain);
+        _connectFutures.remove(transportCacheKey);
         rethrow;
       }
       if (_forceClosed) {
         transportState.dispose();
       } else {
-        _transportsMap[domain] = transportState;
-        final _ = _connectFutures.remove(domain);
+        _transportsMap[transportCacheKey] = transportState;
+        final _ = _connectFutures.remove(transportCacheKey);
       }
     } else {
       // Check whether the connection is terminated, if it is, reconnecting.
       if (!transportState.transport.isOpen) {
         transportState.dispose();
-        _transportsMap[domain] = transportState = await _connect(options);
+        _transportsMap[transportCacheKey] =
+            transportState = await _connect(options, redirects);
       }
     }
     return transportState.activeTransport;
@@ -73,8 +90,12 @@ class _ConnectionManager implements ConnectionManager {
 
   Future<_ClientTransportConnectionState> _connect(
     RequestOptions options,
+    List<RedirectRecord> redirects,
   ) async {
-    final uri = options.uri;
+    Uri uri = options.uri;
+    if (redirects.isNotEmpty) {
+      uri = Http2Adapter.resolveRedirectUri(uri, redirects.last.location);
+    }
     final domain = '${uri.host}:${uri.port}';
     final clientConfig = ClientSetting();
     if (onClientCreate != null) {
@@ -162,7 +183,7 @@ class _ConnectionManager implements ConnectionManager {
         context: clientConfig.context,
         onBadCertificate: clientConfig.onBadCertificate,
         supportedProtocols: ['h2'],
-      );
+      ).timeout(_handshakeTimeout);
       _throwIfH2NotSelected(target, socket);
       return socket;
     }
@@ -239,7 +260,7 @@ class _ConnectionManager implements ConnectionManager {
       context: clientConfig.context,
       onBadCertificate: clientConfig.onBadCertificate,
       supportedProtocols: ['h2'],
-    );
+    ).timeout(_handshakeTimeout);
     _throwIfH2NotSelected(target, socket);
 
     proxySubscription.cancel();
@@ -279,17 +300,17 @@ class _ConnectionManager implements ConnectionManager {
 class _ClientTransportConnectionState {
   _ClientTransportConnectionState(this.transport);
 
-  ClientTransportConnection transport;
+  final ClientTransportConnection transport;
+
+  bool isActive = true;
+  late DateTime latestIdleTimeStamp;
+  Timer? _timer;
 
   ClientTransportConnection get activeTransport {
     isActive = true;
     latestIdleTimeStamp = DateTime.now();
     return transport;
   }
-
-  bool isActive = true;
-  late DateTime latestIdleTimeStamp;
-  Timer? _timer;
 
   void delayClose(Duration idleTimeout, void Function() callback) {
     const duration = Duration(milliseconds: 100);

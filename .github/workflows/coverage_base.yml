@@ -23,7 +23,7 @@ jobs:
     env:
       TEST_PRESET: all
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: subosito/flutter-action@v2
         with:
           cache: true
@@ -36,6 +36,7 @@ jobs:
       - uses: bluefireteam/melos-action@v3
         with:
           run-bootstrap: false
+          melos-version: '^6.0.0'
       - name: Check satisfied packages
         run: |
           dart ./scripts/melos_packages.dart
@@ -76,6 +77,6 @@ jobs:
         run: melos run test:flutter
       - name: '[Coverage] Generate report'
         run: melos run coverage:combine
-      - uses: clearlyip/code-coverage-report-action@v5
+      - uses: clearlyip/code-coverage-report-action@v6
         with:
           filename: 'coverage/cobertura.xml'

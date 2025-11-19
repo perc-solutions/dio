@@ -286,6 +286,7 @@ abstract class DioMixin implements Dio {
     ProgressCallback? onReceiveProgress,
     CancelToken? cancelToken,
     bool deleteOnError = true,
+    FileAccessMode fileAccessMode = FileAccessMode.write,
     String lengthHeader = Headers.contentLengthHeader,
     Object? data,
     Options? options,
@@ -298,6 +299,7 @@ abstract class DioMixin implements Dio {
       deleteOnError: deleteOnError,
       cancelToken: cancelToken,
       data: data,
+      fileAccessMode: fileAccessMode,
       options: options,
     );
   }
@@ -310,6 +312,7 @@ abstract class DioMixin implements Dio {
     Map<String, dynamic>? queryParameters,
     CancelToken? cancelToken,
     bool deleteOnError = true,
+    FileAccessMode fileAccessMode = FileAccessMode.write,
     String lengthHeader = Headers.contentLengthHeader,
     Object? data,
     Options? options,
@@ -757,6 +760,21 @@ abstract class DioMixin implements Dio {
       );
     }
     return response;
+  }
+
+  @override
+  Dio clone({
+    BaseOptions? options,
+    Interceptors? interceptors,
+    HttpClientAdapter? httpClientAdapter,
+    Transformer? transformer,
+  }) {
+    final dio = Dio(options ?? this.options);
+    dio.interceptors.removeImplyContentTypeInterceptor();
+    dio.interceptors.addAll(interceptors ?? this.interceptors);
+    dio.httpClientAdapter = httpClientAdapter ?? this.httpClientAdapter;
+    dio.transformer = transformer ?? this.transformer;
+    return dio;
   }
 }
 
